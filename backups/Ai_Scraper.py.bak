@@ -1,0 +1,120 @@
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.edge.service import Service
+from selenium.webdriver.edge.options import Options
+from bs4 import BeautifulSoup
+from llama_cpp import Llama
+import time
+from urllib.parse import urlparse
+import re
+
+def scrape_page(url):
+    edge_options = Options()
+    edge_options.add_argument("--headless")
+    edge_options.add_argument("--disable-gpu")
+    service = Service(r"F:\Python_Programs\Dependencies\edgedriver_win64\msedgedriver.exe")
+    driver = webdriver.Edge(service=service, options=edge_options)
+    driver.get(url)
+    time.sleep(5)  # Wait for JavaScript to load
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    driver.quit()
+    product_section = soup.find('div', class_='product-details')
+    if not product_section:
+        product_section = soup
+    text = product_section.get_text(separator='\n', strip=True)
+    return text
+
+def gemma_llm_task(context, instruction):
+    max_context_chars = 2000  # Smaller chunk for each LLM call
+    if len(context) > max_context_chars:
+        context = context[:max_context_chars]
+    model_path = r"C:\Users\lukea\.lmstudio\models\lmstudio-community\gemma-3-12B-it-qat-GGUF\gemma-3-12B-it-QAT-Q4_0.gguf"
+    llm = Llama(
+        model_path=model_path,
+        n_ctx=4096,      # Context window for each chunk
+        n_threads=8,
+        n_gpu_layers=-1
+    )
+    output = llm(
+        f"{instruction}\n\nContent:\n{context}\n\nResponse:",
+        max_tokens=1024,  # Lower token count for each chunk
+        temperature=0.7,
+        stop=["Response:"]
+    )
+    response = output["choices"][0]["text"].strip()
+    return response
+
+def url_to_filename(url, ext="txt"):
+    parsed = urlparse(url)
+    domain = parsed.netloc.replace('.', '_')
+    path = re.sub(r'[^a-zA-Z0-9]', '_', parsed.path.strip('/'))
+    if path:
+        filename = f"{domain}_{path}.{ext}"
+    else:
+        filename = f"{domain}.{ext}"
+    return filename
+
+def extract_markdown_table(text):
+    """
+    Extracts the first markdown table from the text and returns it as a pandas DataFrame.
+    """
+    lines = text.splitlines()
+    table_lines = []
+    in_table = False
+    for line in lines:
+        if re.match(r'^\s*\|', line):
+            in_table = True
+            table_lines.append(line.strip())
+        elif in_table and not line.strip():
+            break  # End of table
+    if not table_lines:
+        return None
+    # Remove separator line (e.g., |---|---|---|)
+    if len(table_lines) > 1 and re.match(r'^\s*\|[\s\-|]+\|$', table_lines[1]):
+        del table_lines[1]
+    # Convert to DataFrame
+    data = [row.strip('|').split('|') for row in table_lines]
+    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    return df
+
+def chunk_text(text, max_chars=2000):
+    """Yield successive max_chars-sized chunks from text."""
+    for i in range(0, len(text), max_chars):
+        yield text[i:i + max_chars]
+
+if __name__ == "__main__":
+    while True:
+        url = input("Enter the URL to scrape (or type 'exit' to quit): ").strip()
+        if url.lower() == "exit":
+            print("Exiting program.")
+            break
+        instruction = input("What should the LLM do with the scraped content? (e.g., Summarize, Extract table, etc.): ").strip()
+        print("Scraping page...")
+        content = scrape_page(url)
+        print(f"Running LLM with instruction: {instruction}")
+        save_type = input("Save as (1) Text file or (2) Excel spreadsheet? Enter 1 or 2: ").strip()
+        if save_type == "2":
+            filename = url_to_filename(url, "xlsx")
+            all_tables = []
+            for idx, chunk in enumerate(chunk_text(content, max_chars=2000)):
+                print(f"Processing chunk {idx+1}...")
+                response = gemma_llm_task(chunk, instruction)
+                df = extract_markdown_table(response)
+                if df is not None:
+                    all_tables.append(df)
+            if all_tables:
+                final_df = pd.concat(all_tables, ignore_index=True)
+                final_df.to_excel(filename, index=False)
+                print(f"Combined table saved to {filename}\n")
+            else:
+                # Fallback: save the whole response in one column, one paragraph per row
+                rows = [para.strip() for para in response.split('\n\n') if para.strip()]
+                df = pd.DataFrame({"Response": rows})
+                df.to_excel(filename, index=False)
+                print(f"No table found. Response saved to {filename}\n")
+        else:
+            filename = url_to_filename(url, "txt")
+            response = gemma_llm_task(content, instruction)
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(response)
+            print(f"Response saved to {filename}\n")
