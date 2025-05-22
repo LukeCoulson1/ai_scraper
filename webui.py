@@ -460,12 +460,7 @@ if run_button and urls:
                     html_tables = extract_html_tables(html, base_url=next_url)
                     all_tables.extend(html_tables)
                 all_responses.extend(responses)
-                soup = BeautifulSoup(html, 'html.parser')
-                images = [img['src'] for img in soup.find_all('img', src=True)]
-                if images:
-                    st.markdown("#### Images Found")
-                    for img_url in images[:10]:
-                        st.image(img_url, caption=img_url)
+                # --- Images Found section removed here ---
                 if changed and st.button("Notify me of changes", key=f"notify_{url}_{page_count}"):
                     st.success("Notification sent! (demo)")
                 if pagination:
