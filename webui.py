@@ -314,14 +314,26 @@ show_dashboard()
 
 with st.sidebar:
     st.header("Configuration")
-    model_dir = r"C:\Users\lukea\.lmstudio\models\lmstudio-community"
+    model_dir = st.text_input(
+        "LLM model directory",
+        value=st.session_state.get("model_dir", r"C:\Users\lukea\.lmstudio\models\lmstudio-community"),
+        key="llm_model_dir"
+    )
+    st.session_state.model_dir = model_dir  # Save for next time
+
     models = [os.path.join(root, file)
               for root, _, files in os.walk(model_dir)
               for file in files if file.endswith(".gguf")]
     if not models:
         st.error(f"No models found in {model_dir}")
         st.stop()
-    model_path = st.selectbox("Choose LLM model", models)
+
+    model_path = st.selectbox(
+        "Choose LLM model",
+        models,
+        format_func=lambda p: os.path.basename(p)
+    )
+
     prompt_keys = list(PROMPT_TEMPLATES.keys())
     prompt_idx = st.selectbox("Prompt template", range(len(prompt_keys)), format_func=lambda i: prompt_keys[i])
     prompt_template = PROMPT_TEMPLATES[prompt_keys[prompt_idx]]
@@ -460,7 +472,6 @@ if run_button and urls:
                     html_tables = extract_html_tables(html, base_url=next_url)
                     all_tables.extend(html_tables)
                 all_responses.extend(responses)
-                # --- Images Found section removed here ---
                 if changed and st.button("Notify me of changes", key=f"notify_{url}_{page_count}"):
                     st.success("Notification sent! (demo)")
                 if pagination:
