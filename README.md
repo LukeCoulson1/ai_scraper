@@ -41,6 +41,6 @@ Requirements:
 
 For Cuda Support - https://developer.nvidia.com/cuda-12-1-0-download-archive
 
-Windows: Visual Studio or MinGW - https://visualstudio.microsoft.com/downloads/
+Windows: Visual Studio or MinGW - https://visualstudio.microsoft.com/downloads/ make sure to install python and c++ in visual studio install!
 
 >>>>>>> 2f0718f43d19e2f72892521fb50188d48dce3671
