@@ -43,4 +43,6 @@ For Cuda Support - https://developer.nvidia.com/cuda-12-1-0-download-archive
 
 Windows: Visual Studio or MinGW - https://visualstudio.microsoft.com/downloads/
 
+4b gemma can be found here - https://huggingface.co/mlabonne/gemma-3-4b-it-qat-abliterated-GGUF
+
 >>>>>>> 2f0718f43d19e2f72892521fb50188d48dce3671
